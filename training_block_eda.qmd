@@ -14,6 +14,43 @@ import matplotlib.pyplot as plt
 ```
 
 ```{python}
+# Join pace intensity from paces_df into training_df for a given pace column.
+# pace_col: column in df holding the pace zone name (e.g. 'speed_rep_pace_name')
+# result_col: name for the new intensity column added to df
+def merge_intensity(df, pace_col, result_col):
+    lookup = paces_df[['name', 'intensity']].rename(columns={'name': pace_col, 'intensity': result_col})
+    return pd.merge(df, lookup, on=pace_col, how='left')
+
+# Line chart with distance on the left y-axis and intensity on the right y-axis.
+def dual_axis_plot(weeks, primary_y, secondary_y, title, primary_label, secondary_label):
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    ax1.plot(weeks, primary_y, marker='o', color='green', label=primary_label)
+    ax1.set_title(title)
+    ax1.set_xlabel('Week')
+    ax1.set_ylabel(primary_label, color='green')
+    ax1.tick_params(axis='y', labelcolor='green')
+    ax1.grid(True)
+
+    ax2 = ax1.twinx()
+    ax2.plot(weeks, secondary_y, marker='x', color='red', linestyle='--', label=secondary_label)
+    ax2.set_ylabel(secondary_label, color='red')
+    ax2.tick_params(axis='y', labelcolor='red')
+
+    handles = [
+        plt.Line2D([0], [0], color='green', marker='o', label=primary_label),
+        plt.Line2D([0], [0], color='red', marker='x', linestyle='--', label=secondary_label),
+    ]
+    ax1.legend(handles=handles, loc='upper left')
+    plt.xticks(weeks)
+    plt.show()
+```
+
+## Data
+
+`paces_df` defines the six pace zones and their ordinal intensity (1 = Easy → 6 = Mile pace). That intensity scale is the key derived variable joined into the weekly training data for visualization.
+
+```{python}
 paces_df = pd.read_csv('data/paces.csv')
 training_df = pd.read_csv('data/training.csv')
 
@@ -24,26 +61,26 @@ paces_df
 training_df
 ```
 
+## Feature Engineering
+
+Merge pace intensity into `training_df` for both the speed session and the long run, then compute total speed workout volume for the week.
+
 ```{python}
-paces_speed_merge = paces_df[['name', 'intensity']].rename(columns={'name': 'merge_name', 'intensity': 'speed_intensity_temp'})
+training_df = merge_intensity(training_df, 'speed_rep_pace_name', 'speed_intensity')
+training_df = merge_intensity(training_df, 'long_run_pace_name', 'long_run_intensity')
 
-training_df = pd.merge(training_df, paces_speed_merge, left_on='speed_rep_pace_name', right_on='merge_name', how='left')
-training_df['speed_intensity'] = training_df['speed_intensity_temp']
-training_df = training_df.drop(columns=['merge_name', 'speed_intensity_temp'], errors='ignore')
-
-paces_long_run_merge = paces_df[['name', 'intensity']].rename(columns={'name': 'merge_name', 'intensity': 'long_run_intensity_temp'})
-
-training_df = pd.merge(training_df, paces_long_run_merge, left_on='long_run_pace_name', right_on='merge_name', how='left')
-training_df['long_run_intensity'] = training_df['long_run_intensity_temp']
-training_df = training_df.drop(columns=['merge_name', 'long_run_intensity_temp'], errors='ignore')
-
+# Easy long runs have no structured pace target — treat their intensity as 0
 training_df['long_run_intensity'] = training_df['long_run_intensity'].fillna(0)
+
+# Total structured speed volume per week: number of reps × distance per rep
 training_df['speed_total_workout_distance'] = training_df['n_speed_reps'] * training_df['speed_rep_distance (mi)']
 
 training_df.head()
 ```
 
-Now that the `intensity` information is merged into the `training_df`, the plots below overlay intensity on the same chart using a secondary y-axis for better visualization.
+## Plots
+
+The plots below overlay intensity on a secondary y-axis so volume and effort level can be read together on the same chart.
 
 ```{python}
 plt.figure(figsize=(12, 6))
@@ -59,45 +96,23 @@ plt.show()
 ```
 
 ```{python}
-plt.figure(figsize=(12, 6))
-ax1 = plt.gca()
-ax1.plot(training_df['week'], training_df['speed_total_workout_distance'], marker='o', color='green', label='Speed Total Workout Distance')
-ax1.set_title('Speed Session Total Workout Distance and Pace Intensity by Week')
-ax1.set_xlabel('Week')
-ax1.set_ylabel('Speed Session Total Workout Distance (miles)', color='green')
-ax1.tick_params(axis='y', labelcolor='green')
-ax1.grid(True)
-
-ax2 = ax1.twinx()
-ax2.plot(training_df['week'], training_df['speed_intensity'], marker='x', color='red', linestyle='--', label='Pace Intensity')
-ax2.set_ylabel('Pace Intensity', color='red')
-ax2.tick_params(axis='y', labelcolor='red')
-
-handles1, labels1 = ax1.get_legend_handles_labels()
-handles2, labels2 = ax2.get_legend_handles_labels()
-ax1.legend(handles1 + handles2, labels1 + labels2, loc='upper left')
-
-plt.xticks(training_df['week'])
-plt.show()
+dual_axis_plot(
+    weeks=training_df['week'],
+    primary_y=training_df['speed_total_workout_distance'],
+    secondary_y=training_df['speed_intensity'],
+    title='Speed Session Volume and Pace Intensity by Week',
+    primary_label='Speed Total Workout Distance (miles)',
+    secondary_label='Pace Intensity',
+)
 ```
 
 ```{python}
-plt.figure(figsize=(12, 6))
-ax1 = plt.gca()
-line1, = ax1.plot(training_df['week'], training_df['long_run_speed_pace_distance (mi)'], marker='o', color='green', label='Long Run Speed Pace Distance')
-ax1.set_title('Long Run Speed Pace Distance and Pace Intensity by Week')
-ax1.set_xlabel('Week')
-ax1.set_ylabel('Long Run Speed Pace Distance (mi)', color='green')
-ax1.tick_params(axis='y', labelcolor='green')
-ax1.grid(True)
-
-ax2 = ax1.twinx()
-line2, = ax2.plot(training_df['week'], training_df['long_run_intensity'], marker='x', color='red', linestyle='--', label='Long Run Pace Intensity')
-ax2.set_ylabel('Long Run Pace Intensity', color='red')
-ax2.tick_params(axis='y', labelcolor='red')
-
-ax1.legend([line1, line2], ['Long Run Speed Pace Distance', 'Long Run Pace Intensity'], loc='upper left')
-
-plt.xticks(training_df['week'])
-plt.show()
+dual_axis_plot(
+    weeks=training_df['week'],
+    primary_y=training_df['long_run_speed_pace_distance (mi)'],
+    secondary_y=training_df['long_run_intensity'],
+    title='Long Run Speed Pace Distance and Intensity by Week',
+    primary_label='Long Run Speed Pace Distance (mi)',
+    secondary_label='Long Run Pace Intensity',
+)
 ```
