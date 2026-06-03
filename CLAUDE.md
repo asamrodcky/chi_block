@@ -14,6 +14,13 @@ workout intensity, and long run structure leading into Chicago 2026.
 - `long_run_intensity = 0` means the long run had no structured pace component
 - `speed_total_workout_distance` is derived: n_reps × rep_distance
 
+## Code structure
+- `merge_intensity(df, pace_col, result_col)` — joins pace zone intensity from paces_df into training_df; used for both speed and long run intensity columns
+- `dual_axis_plot(...)` — shared helper for all dual y-axis charts (distance left, intensity right)
+
 ## Stack
-- Python (venv), pandas, matplotlib
-- Quarto for rendering (`quarto render training_block_eda.qmd`)
+- Python (venv) — activate with `source venv/bin/activate` before running quarto
+- pandas, matplotlib
+- Quarto: preview locally with `quarto preview training_block_eda.qmd`, render with `quarto render training_block_eda.qmd`
+- GitHub remote: https://github.com/asamrodcky/chi_block.git
+- GitHub Pages (not yet configured) — future option to host rendered HTML at asamrodcky.github.io/chi_block
